@@ -1,5 +1,7 @@
 # EKSWorkshop
 
+This is the automation of the different parts for https://eksworkshop.com
+
 1. Install the Kubernetes tools 
 ./eksworkshop_install_kubernetes_tools.sh 
 
