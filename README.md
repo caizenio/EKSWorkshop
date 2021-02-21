@@ -19,3 +19,9 @@ This is the automation of the different parts for https://eksworkshop.com
 
 6. Increase disk size
 ./eksworkshop_increase_disksize_c9.sh
+
+7. Create the cluster
+https://www.eksworkshop.com/030_eksctl/launcheks/#create-an-eks-cluster
+
+8. Set the cluster credentials and configmap
+./eksworkshop_eksctl_setcred_configmap.sh 
