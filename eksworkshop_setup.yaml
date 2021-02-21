@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: "VPC infrastructure setup and deployment for Cloud9 IDE for EKS workshop - https://www.eksworkshop.com"
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: "k8s-cluster-mgmt-vpc"
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: "k8s-cluster-mgmt-igw"
+  AttachInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PubSub:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: "k8s-cluster-mgmt-pubsub"
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: "k8s-cluster-mgmt-pubrt"
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachInternetGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PubSub
+      RouteTableId: !Ref PublicRouteTable
+  Cloud9InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      RoleName: "eksworkshop-admin"
+  Cloud9InstancePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: Cloud9AdminAccessPolicy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+      Roles:
+        - !Ref Cloud9InstanceRole
+  Cloud9InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: "eksworkshop-admin"
+      Path: /
+      Roles:
+        - !Ref Cloud9InstanceRole
+  EksCloud9Ide:
+    DependsOn: AttachInternetGateway
+    Type: "AWS::Cloud9::EnvironmentEC2"
+    Properties:
+      Description: "Cloud9 IDE for the AWS EKS Workshop"
+      AutomaticStopTimeMinutes: 150
+      InstanceType: t3.small
+      Name: eksworkshop
+      SubnetId: !Ref PubSub
+      Repositories:
+        - RepositoryUrl: !Sub 'https://github.com/brentley/ecsdemo-frontend.git'
+          PathComponent: !Sub 'ecsdemo-frontend'
+        - RepositoryUrl: !Sub 'https://github.com/brentley/ecsdemo-nodejs.git'
+          PathComponent: !Sub 'ecsdemo-nodejs'
+        - RepositoryUrl: !Sub 'https://github.com/brentley/ecsdemo-crystal.git'
+          PathComponent: !Sub 'ecsdemo-crystal'
+
+Outputs:
+  EksCloud9Ide:
+    Description: "eksworkshop"
+    Value:
+      !Join ["",["https://",!Ref "AWS::Region",".console.aws.amazon.com/cloud9/ide/",!Ref EksCloud9Ide,"?region=",!Ref "AWS::Region"]]
+  VPC:
+    Description: "VPC id for eksworkshop"
+    Value: !Ref VPC
+    Export:
+      Name: k8s-cluster-mgmt-vpc
+  PublicSubnet1:
+    Description: "Public subnet 1 id (subnet id) in which cloud9 is intantiated"
+    Value: !Ref PubSub
+    Export:
+      Name: "k8s-cluster-mgmt-pubsub"
+  Cloud9RoleArn:
+    Description: "Cloud9 Role Arn"  
+    Value: !GetAtt  Cloud9InstanceRole.Arn
+    Export: 
+      Name: Cloud9RoleArn
